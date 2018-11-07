@@ -136,15 +136,15 @@ class Usernotes:
         elif isinstance(thing, praw.reddit.models.ModmailConversation):
             l = "https://mod.reddit.com/mail/perma/{}".format(thing.id)
         newUsernote = {"l": l, "m": m, "n": n, "t": t, "w": w}
-        userNotes["ns"].insert(0, newUsernote)
+        userNotes["ns"].insert(0, newUsernote, user.name)
         data[0][user.name] = userNotes
         if modsUpdated:
-            self.__saveUsernotesAndUpdateMods(data[0], mods)
+            self.__saveUsernotesAndUpdateMods(data[0], mods, user.name)
         else:
             self.__saveUsernotes(data[0])
 
     
-    def __saveUsernotes(self, data):
+    def __saveUsernotes(self, data, user):
         sub = self.subreddit
         wikiPage = sub.wiki["usernotes"]
         wikiPage._fetch()
@@ -157,11 +157,11 @@ class Usernotes:
             finalOutput += line
         content["blob"] = finalOutput
         content_md = json.dumps(content, separators=(",", ":"))
-        wikiPage.edit(content=content_md)
+        wikiPage.edit(content=content_md, "create new note on new user {} via Spaz's Usernote Module".format(user))
         return finalOutput
 
     
-    def __saveUsernotesAndUpdateMods(self, data, mods: [str]):
+    def __saveUsernotesAndUpdateMods(self, data, mods: [str], user):
         sub = self.subreddit
         wikiPage = sub.wiki["usernotes"]
         wikiPage._fetch()
@@ -175,5 +175,5 @@ class Usernotes:
         content["blob"] = finalOutput
         content["constants"]["users"] = mods
         content_md = json.dumps(content, separators=(",", ":"))
-        wikiPage.edit(content=content_md)
+        wikiPage.edit(content=content_md, "create new note on new user {} via Spaz's Usernote Module".format(user))
         return finalOutput
