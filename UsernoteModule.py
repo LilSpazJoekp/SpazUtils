@@ -16,7 +16,7 @@ class Usernotes:
         self.subreddit = subreddit
         
 
-    @staticmethod
+    
     def getUsernotes(self):
         """Returns Usernotes, mods, and note types,
 
@@ -69,7 +69,7 @@ class Usernotes:
         wikiPage._fetch()
         content = json.loads(wikiPage.content_md)
         if not content["ver"] == 6:
-            raise Exception("Usernotes version 5 is not supported. Please update to version 6.")
+            raise Exception("Usernotes version 5 is not supported. Please update your usernotes to version 6.")
         mods = content["constants"]["users"]
         warningTypes = content["constants"]["warnings"]
         blob = content["blob"]
@@ -99,14 +99,14 @@ class Usernotes:
             -------
             nothing
         """
-        mod = reddit.user.me()
+        mod = self.reddit.user.me()
 
         if not mod in subreddit.moderator():
             raise Exception("Current authencated user, {}, is not a moderator of {}".format(mod, subreddit.display_name))
         if not "wiki" in subreddit.moderator.PERMISSIONS:
             raise Exception("Current authencated user, {}, does not have Wiki permissions on {}".format(mod, subreddit.display_name))
         
-        data = self.getUsernotes(self)
+        data = self.getUsernotes()
         notes = data[0]
         mods = data[1]
         modsUpdated = False
@@ -139,11 +139,11 @@ class Usernotes:
         userNotes["ns"].insert(0, newUsernote)
         data[0][user.name] = userNotes
         if modsUpdated:
-            self.__saveUsernotesAndUpdateMods(self, data[0], mods)
+            self.__saveUsernotesAndUpdateMods(data[0], mods)
         else:
-            self.__saveUsernotes(self, data[0])
+            self.__saveUsernotes(data[0])
 
-    @staticmethod
+    
     def __saveUsernotes(self, data):
         sub = self.subreddit
         wikiPage = sub.wiki["usernotes"]
@@ -160,7 +160,7 @@ class Usernotes:
         wikiPage.edit(content=content_md)
         return finalOutput
 
-    @staticmethod
+    
     def __saveUsernotesAndUpdateMods(self, data, mods: [str]):
         sub = self.subreddit
         wikiPage = sub.wiki["usernotes"]
