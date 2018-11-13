@@ -3,15 +3,8 @@ from typing import Union
 from discord import embeds
 
 class FlairRemoval:
+    
     def __init__(self, reddit: praw.Reddit, subreddit: praw.reddit.models.Subreddit, webhook: str):
-        """Initialize a Usernote instance.
-            Parameters
-            ----------
-            reddit: praw.Reddit
-                Reddit instance
-            subreddit: praw.reddit.models.Subreddit
-                Subreddit object you want usernotes from
-        """
         self.reddit = reddit
         self.sub = subreddit
         self.webhook = webhook
@@ -72,7 +65,7 @@ class FlairRemoval:
         if "duration" in params and params["duration"] > 0:
             self.sub.banned.add(submission.author, duration=params["duration"], ban_reason=params["ban_reason"], ban_message=params["ban_message"], note=params["ban_note"])
         else:
-            self.sub.banned.add(submission.author, duration=params["duration"], ban_reason=params["ban_reason"], ban_message=params["ban_message"], note=params["ban_note"])
+            self.sub.banned.add(submission.author, duration=params["duration"], ban_reason=params["ban_reason"], ban_message=params["ban_message"].format(submission), note=params["ban_note"])
 
     def parseReports(self, submission: praw.models.reddit.submission.Submission):
         userReports = []

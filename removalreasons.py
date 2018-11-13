@@ -19,7 +19,7 @@ actionParam = {
     "ban": {
         "duration": 7,
         "ban_reason": "You were banned for posting a meme about a violent tragedy",
-        "ban_message": "You were banned for posting a meme about a violent tragedy.\n\n#[{}]({})",
+        "ban_message": "You were banned for posting a meme about a violent tragedy.\n\n#[{0.title}]({0.shortlink})",
         "ban_note": "You were banned for posting a meme about a violent tragedy"
         },
     "usernote": {
@@ -33,7 +33,7 @@ actionParam11 = {
     "ban": {
         "duration": 14,
         "ban_reason": "You were banned for posting a meme about a violent tragedy",
-        "ban_message": "You were banned for posting a meme about a violent tragedy.\n\n#[{}]({})",
+        "ban_message": "You were banned for posting a meme about a violent tragedy.\n\n#[{0.title}]({0.shortlink})",
         "ban_note": "You were banned for posting a meme about a violent tragedy"
         },
     "usernote": {
@@ -47,7 +47,7 @@ actionParam2 = {
     "ban": {
         "duration": 3,
         "ban_reason": "You were banned for asking for upvotes",
-        "ban_message": "You were banned for asking for upvotes\n\n#[{}]({})",
+        "ban_message": "You were banned for asking for upvotes\n\n#[{0.title}]({0.shortlink})",
         "ban_note": "You were banned for asking for upvotes"
         },
     "usernote": {
