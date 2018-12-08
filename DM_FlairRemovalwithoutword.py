@@ -41,15 +41,57 @@ sub = reddit.subreddit('dankmemes')
 logStream = modlogstream.stream_generator(sub.mod.log)
 action = FlairRemoval(reddit, sub, webhook1).action
 
+logStream = modlogstream.stream_generator(sub.mod.log)
+action = FlairRemoval(reddit, sub, webhook1).action
+print('Starting bot')
+def checkLog():
+    print('Checking last 25 flair edits...')
+    for modAction in sub.mod.log(action='editflair', limit=250):
+        try:
+            if modAction.target_fullname:
+                if modAction.target_fullname[:2] == "t3" and modAction.details == "flair_edit":
+                    submission = reddit.submission(id=modAction.target_fullname[3:])
+                    print(submission)
+                    removed = []
+                    if not os.path.isfile('removed'):
+                        f = open('removed', 'w')
+                        f.close
+                    with open('removed', 'r') as f:
+                        removed = f.read().split('\n')
+                    if submission.link_flair_text in flair_list:
+                        if not submission.shortlink in removed:
+                            print('Found {}'.format(submission.link_flair_text))
+                            actionParam = flair_list[submission.link_flair_text]
+                            action(submission, actionParam)
+                            print('removed {} post'.format(submission.link_flair_text))
+                            with open('removed', 'a') as f:
+                                f.write('{}\n'.format(submission.shortlink))
+                        else:
+                            print('Already removed: {}'.format(submission.id))
+        except Exception as error:
+            print(error)
+
 while True:
     try:
+        checkLog()
+        print('Scanning Modlog')
         for modAction in logStream:
-            if modAction.action == "editflair" and modAction.target_fullname[:2] == "t3":
-                submission = reddit.submission(id=modAction.target_fullname[3:])
-                if submission.link_flair_text in flair_list: 
-                    actionParam = flair_list[submission.link_flair_text]
-                    action(submission, actionParam)
-                    print('removed {} post'.format(submission.link_flair_text))
+            if modAction.target_fullname:
+                if modAction.action == "editflair" and modAction.target_fullname[:2] == "t3":
+                    submission = reddit.submission(id=modAction.target_fullname[3:])
+                    removed = []
+                    with open('removed', 'r') as f:
+                        removed = f.read().split('\n')
+                    if submission.link_flair_text in flair_list:
+                        if not submission.shortlink in removed:
+                            print('Found {}'.format(submission.link_flair_text))
+                            actionParam = flair_list[submission.link_flair_text]
+                            action(submission, actionParam)
+                            print('removed {} post'.format(submission.link_flair_text))
+                            with open('removed', 'a') as f:
+                                f.write('{}\n'.format(submission.shortlink))
+                        else:
+                            print('Already removed: {}'.format(submission.id))
     except:
         print("Unexpected error:", sys.exc_info()[0])
         raise
