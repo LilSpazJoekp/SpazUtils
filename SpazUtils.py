@@ -103,7 +103,7 @@ class FlairRemoval:
         else:
             return ((final, len(modReports)), (dismissedFinal, len(modReportsDismissed)))
 
-    def parseUsernotes(self, subredditUsernotes: Usernotes, user):
+    def parseUsernotes(self, subredditUsernotes, user):
         submission = None
         comment = None
         link = ""
@@ -237,7 +237,6 @@ class Usernotes:
         else:
             return [json.loads(zlib.decompress(decodedBase64).decode("utf-8")), mods, warningTypes]
     
-    # @staticmethod
     def addUsernote(self, user: praw.reddit.models.Redditor, note: str, thing: Union[praw.reddit.models.Submission, praw.reddit.models.Comment, praw.reddit.models.ModmailConversation, str, None], subreddit: praw.reddit.models.Subreddit, warningType: str):
         """Adds an usernote, to the selected subreddit and automatically saves it to wiki page.
 
@@ -261,7 +260,9 @@ class Usernotes:
             nothing
         """
         mod = self.reddit.user.me()
-
+        
+        if user == None:
+            raise Exception("User deleted account")
         if not mod in subreddit.moderator():
             raise Exception("Current authencated user, {}, is not a moderator of {}".format(mod, subreddit.display_name))
         if not "wiki" in subreddit.moderator.PERMISSIONS:
