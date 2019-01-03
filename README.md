@@ -2,4 +2,4 @@
 Reddit Moderation Tools
 ---
 
-Coming soon^™️
+Coming soon™️
