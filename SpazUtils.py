@@ -9,24 +9,32 @@ class FlairRemoval:
         self.sub = subreddit
         self.webhook = webhook
 
-    def action(self, submission: praw.models.reddit.submission.Submission, action: dict):
-        submission.mod.remove()
-        time.sleep(0.1)
-        try:
-            if 'ban' in action:
-                self.setBan(submission, action['ban'])
-        except Exception as error:
-            print(error)
-        comment = submission.reply(action['commentReply'])
-        comment.mod.distinguish(how='yes', sticky=True)
-        comment.mod.approve()
+    def action(self, submission: praw.models.reddit.submission.Submission, action: dict, testing=False):
+        if not testing:
+            submission.mod.remove()
+            try:
+                if 'ban' in action:
+                    self.setBan(submission, action['ban'])
+            except Exception as error:
+                print(error)
+            try:
+                if 'lock' in action:
+                    submission.mod.lock()
+            except Exception as error:
+                print(error)
+            comment = submission.reply(action['commentReply'])
+            comment.mod.distinguish(how='yes', sticky=True)
+            comment.mod.approve()
+            if 'usernote' in action:
+                usernote = action['usernote']
+                try:
+                    subredditUsernotes = Usernotes(reddit=self.reddit, subreddit=submission.subreddit)
+                    subredditUsernotes.addUsernote(user=submission.author, note=usernote['usernote'], thing=submission, subreddit=submission.subreddit, warningType=usernote['usernoteWarningType'])
+                except Exception as error:
+                    print(error)
         data = {"embeds": self.generateEmbed(submission, action)}
         requests.post(self.webhook, json=data)
-        if 'usernote' in action:
-            usernote = action['usernote']
-            subredditUsernotes = Usernotes(reddit=self.reddit, subreddit=submission.subreddit)
-            subredditUsernotes.addUsernote(user=submission.author, note=usernote['usernote'], thing=submission, subreddit=submission.subreddit, warningType=usernote['usernoteWarningType'])
-            
+        
     def generateEmbed(self, submission: praw.models.reddit.submission.Submission, params: dict):
         embed = embeds.Embed(title="Bot Removal Notification", url=submission.shortlink, description=params['description'])
         if not submission.is_self:
@@ -52,7 +60,6 @@ class FlairRemoval:
         if userReports:    
             if not userReports[0][1] == 0:
                 embed.add_field(name="User Reports ({}):".format(userReports[0][1]), value=userReports[0][0], inline=True)
-            userReports = self.parseReports(submission)
             if not userReports[1][1] == 0:
                 embed.add_field(name="User Reports Dismissed ({}):".format(userReports[1][1]), value=userReports[1][0], inline=True)
         usernotesString = self.parseUsernotes(Usernotes(reddit=self.reddit, subreddit=submission.subreddit), submission.author.name)
@@ -69,28 +76,30 @@ class FlairRemoval:
 
     def parseReports(self, submission: praw.models.reddit.submission.Submission):
         userReports = []
-        userReports = []
+        userReportsDismissed = []
         userReports = submission.user_reports
         if "user_reports_dismissed" in vars(submission):
-            userReports.append(submission.user_reports_dismissed[0])
+            for dismissedReport in submission.user_reports_dismissed:
+                userReportsDismissed.append(dismissedReport)
         reportString = "{0[1]}: {0[0]}\n"
         final = ""
         for report in userReports:
             final += reportString.format(report)
         dismissedFinal = ""
-        for report in userReports:
+        for report in userReportsDismissed:
             dismissedFinal += reportString.format(report)
         if len(final) == 0 and len(dismissedFinal) == 0:
             return
         else:
-            return ((final, len(userReports)), (dismissedFinal, len(userReports)))
+            return ((final, len(userReports)), (dismissedFinal, len(userReportsDismissed)))
 
     def parseModReports(self, submission: praw.models.reddit.submission.Submission):
         modReports = []
         modReportsDismissed = []
         modReports = submission.mod_reports
         if "mod_reports_dismissed" in vars(submission):
-            modReportsDismissed.append(submission.mod_reports_dismissed[0])
+            for dismissedReport in submission.mod_reports_dismissed:
+                modReportsDismissed.append(dismissedReport)
         reportString = "{0[1]}: {0[0]}\n"
         final = ""
         for report in modReports:
