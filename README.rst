@@ -28,4 +28,4 @@ Simple Flair Bot Example:
 TODO
 ~~~~
 
--  Finish documentation and improve documentation
+-  Finish and improve documentation
