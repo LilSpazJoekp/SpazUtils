@@ -1,7 +1,6 @@
 import praw, psycopg2
 import SpazUtils
 from SpazUtils import FlairRemoval
-
 from removalreasons import flairList
 import config
 from BotUtils.CommonUtils import BotServices
@@ -41,12 +40,6 @@ logStream = flairRemoval.logStream
 checkModAction = flairRemoval.checkModAction
 
 import logging
-
-handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG)
-logger = logging.getLogger('SpazUtils')
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
 
 ###starting bot####
 print('Starting bot')
