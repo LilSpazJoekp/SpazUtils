@@ -7,8 +7,10 @@ from setuptools import setup
 packageName = 'SpazUtils'
 with open(path.join(path.abspath(path.dirname(__file__)), 'README.rst'), encoding='utf-8') as fp:
     README = fp.read()
-with open(path.join(path.abspath(path.dirname(__file__)), packageName, 'info.py'), encoding='utf-8') as fp:
-    VERSION = re.search("__version__ = '([^']+)'", fp.read()).group(1)
+# with open(path.join(path.abspath(path.dirname(__file__)), packageName, 'info.py'), encoding='utf-8') as fp:
+#     VERSION = re.search("__version__ = '([^']+)'", fp.read()).group(1)
+
+VERSION = '0.0.2'
 
 setup(
     author='Lil_SpazJoekp',
@@ -16,7 +18,7 @@ setup(
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: gpl-3.0 License',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7'
