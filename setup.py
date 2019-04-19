@@ -10,7 +10,7 @@ with open(path.join(path.abspath(path.dirname(__file__)), 'README.rst'), encodin
 # with open(path.join(path.abspath(path.dirname(__file__)), packageName, 'info.py'), encoding='utf-8') as fp:
 #     VERSION = re.search("__version__ = '([^']+)'", fp.read()).group(1)
 
-VERSION = '0.0.2'
+VERSION = '0.0.3'
 
 setup(
     author='Lil_SpazJoekp',
@@ -24,7 +24,7 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],
     description=('Utilities for Automating Moderation on Reddit'),
-    download_url = 'https://github.com/LilSpazJoekp/SpazUtils/archive/0.0.2.tar.gz',
+    download_url = 'https://github.com/LilSpazJoekp/SpazUtils/archive/0.0.3.tar.gz',
     install_requires=[
         'discord.py>=1.0.1',
         'praw>=6.1.1',
