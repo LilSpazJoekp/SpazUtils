@@ -1,7 +1,5 @@
-"""Provide helper classes used by other models."""
-import random
-import time
 
+import time, random
 
 class BoundedSet(object):
     """A set with a maximum size that evicts the oldest items when necessary.
@@ -49,7 +47,33 @@ class ExponentialCounter(object):
     def reset(self):
         """Reset the counter to 1."""
         self._base = 1
-def stream_generator(function, pause_after=None, skip_existing=False):
+
+
+def permissions_string(permissions, known_permissions):
+    """Return a comma separated string of permission changes.
+
+    :param permissions: A list of strings, or ``None``. These strings can
+       exclusively contain ``+`` or ``-`` prefixes, or contain no prefixes at
+       all. When prefixed, the resulting string will simply be the joining of
+       these inputs. When not prefixed, all permissions are considered to be
+       additions, and all permissions in the ``known_permissions`` set that
+       aren't provided are considered to be removals. When None, the result is
+       ``+all``.
+    :param known_permissions: A set of strings representing the available
+       permissions.
+
+    """
+    to_set = []
+    if permissions is None:
+        to_set = ['+all']
+    else:
+        to_set = ['-all']
+        omitted = sorted(known_permissions - set(permissions))
+        to_set.extend('-{}'.format(x) for x in omitted)
+        to_set.extend('+{}'.format(x) for x in permissions)
+    return ','.join(to_set)
+
+def logStream(function, pause_after=0, skip_existing=False, attribute_name='id', action='editflair'):
     """Yield new items from ListingGenerators and ``None`` when paused.
 
     :param function: A callable that returns a ListingGenerator, e.g.
@@ -66,6 +90,8 @@ def stream_generator(function, pause_after=None, skip_existing=False):
     :param skip_existing: When True does not yield any results from the first
         request thereby skipping any items that existed in the stream prior to
         starting the stream (default: False).
+
+    :param attribute_name: The field to use as an id (default: "fullname").
 
     .. note:: This function internally uses an exponential delay with jitter
        between subsequent responses that contain no new results, up to a
@@ -124,29 +150,29 @@ def stream_generator(function, pause_after=None, skip_existing=False):
            print(comment)
 
     """
-    before_fullname = None
+    before_attribute = None
     exponential_counter = ExponentialCounter(max_counter=16)
-    seen_fullnames = BoundedSet(301)
+    seen_attributes = BoundedSet(301)
     without_before_counter = 0
     responses_without_new = 0
     valid_pause_after = pause_after is not None
     while True:
         found = False
-        newest_fullname = None
+        newest_attribute = None
         limit = 100
-        if before_fullname is None:
+        if before_attribute is None:
             limit -= without_before_counter
             without_before_counter = (without_before_counter + 1) % 30
-        for item in reversed(list(function(
-                limit=limit, params={'before': before_fullname}))):
-            if item.id in seen_fullnames:
+        for item in reversed(list(function(limit=limit, params={'before': before_attribute}, action=action))):
+            attribute = getattr(item, attribute_name)
+            if attribute in seen_attributes:
                 continue
             found = True
-            seen_fullnames.add(item.id)
-            newest_fullname = item.id
+            seen_attributes.add(attribute)
+            newest_attribute = attribute
             if not skip_existing:
                 yield item
-        before_fullname = newest_fullname
+        before_attribute = newest_attribute
         skip_existing = False
         if valid_pause_after and pause_after < 0:
             yield None
