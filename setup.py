@@ -22,7 +22,7 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],
     description=('Utilities for Automating Moderation on Reddit'),
-    download_url = 'https://github.com/LilSpazJoekp/SpazUtils/archive/v_002.tar.gz',
+    download_url = 'https://github.com/LilSpazJoekp/SpazUtils/archive/0.0.2.tar.gz',
     install_requires=[
         'discord.py>=1.0.1',
         'praw>=6.1.1',
