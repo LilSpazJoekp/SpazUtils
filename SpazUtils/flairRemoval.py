@@ -5,7 +5,7 @@ from .usernotes import Usernotes
 from .utils import logStream
 
 log = logging.getLogger(__package__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(name)s :: %(levelname)s :: %(message)s')
 handler.setFormatter(formatter)
@@ -17,12 +17,19 @@ class FlairRemoval:
 
     __all__ = ['checkModAction', 'logStream']
 
-    def __init__(self, reddit: praw.Reddit, subreddit: praw.reddit.models.Subreddit, webhook: str, flairList: dict, botName: str, sql: psycopg2.extensions.cursor):
+    def __init__(self, reddit: praw.Reddit, subreddit: praw.reddit.models.Subreddit, webhook: str, flairList: dict, botName: str, sql: psycopg2.extensions.cursor, slack=False, slackChannel=None, webhookEnabled=True):
         """
         Initialized FlairRemoval Class
 
         :param reddit: reddit instance
-        :param subreddit:
+        :param subreddit: subreddit object
+        :param webhook: webhook url to send removal notifications can be discord or slack. If slack set slack params.
+        :param flairList:  of flairs
+        :param botName: name of bot. Schema name depends on this.
+        :param sql: psycopg2 cursor object
+        :param slack: set true to use slack
+        :param slackChannel: channel for slack webhook
+
         """
         self.reddit = reddit
         self.subreddit = subreddit
@@ -30,14 +37,15 @@ class FlairRemoval:
         self.flairList = flairList
         self.botName = botName or self.reddit.user.me().name
         self.sql = sql
+        self.slack = slack
+        self.slackChannel = slackChannel
+        self.webhookEnabled = webhookEnabled
 
     def logStream(self):
-        return logStream(self.subreddit.mod.log)
+        return logStream(self.subreddit.mod.log, pause_after=0)
 
     def __parseModAction(self, action: praw.models.ModAction, flair: str):
-        sqlStr = f'''INSERT INTO {self.botName}.flairlog(
-            id, created_utc, moderator, target_author, target_body, target_id, target_permalink, target_title, flair)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET created_utc=EXCLUDED.created_utc returning *,case when xmax::text::int > 0 then \'alreadyRemoved\' else \'inserted\' end,ctid;'''
+        sqlStr = f'''INSERT INTO {self.botName}.flairlog(id, created_utc, moderator, target_author, target_body, target_id, target_permalink, target_title, flair) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET created_utc=EXCLUDED.created_utc returning *,case when xmax::text::int > 0 then \'alreadyRemoved\' else \'inserted\' end,ctid;'''
         id = (getattr(action, 'id', None).split('_')[1] if getattr(action, 'id', None) else None)
         created_utc = getattr(action, 'created_utc', None)
         moderator = getattr(action, '_mod', None)
@@ -64,8 +72,10 @@ class FlairRemoval:
         return (sqlStr, data)
 
     def __genDateString(self, epoch=time.localtime(), gmtime=False, format='%B %d, %Y at %I:%M:%S %p %Z'):
-        if not gmtime: return time.strftime(format, time.localtime(epoch))
-        else: return time.strftime(format, time.gmtime(epoch))
+        if not gmtime:
+            return time.strftime(format, time.localtime(epoch))
+        else:
+            return time.strftime(format, time.gmtime(epoch))
 
     def checkModAction(self, modAction: praw.models.ModAction):
         if modAction and modAction.action == 'editflair' and modAction.target_fullname and modAction.target_fullname[:2] == "t3":
@@ -78,20 +88,20 @@ class FlairRemoval:
                 query = self.__parseModAction(modAction, submissionFlair)
                 log.debug('Checking if in flair list')
                 if submissionFlair in self.flairList:
-                    log.debug(f'Found flair: {submissionFlair} by {modAction._mod} at {self.__genDateString(modAction.created_utc, format="%m/%d/%Y %I:%M:%S %p")}')
+                    print(f'Found flair: {submissionFlair} by {modAction._mod} at {self.__genDateString(modAction.created_utc, format="%m/%d/%Y %I:%M:%S %p")}')
                     try:
-                        log.debug('Checking if already actioned')
+                        print('Checking if already actioned')
                         self.sql.execute(*query)
                         results = self.sql.fetchone()
                         alreadyRemoved = results[[i for i, column in enumerate(self.sql.description) if column.name == 'case'][0]] == 'alreadyRemoved'
                         if alreadyRemoved:
-                            log.info(f'Already Removed {submission.shortlink} by {getattr(submission.author, "name", "[deleted]")} with {submissionFlair} flair, Mod: {modAction._mod}')
+                            print(f'Already Removed {submission.shortlink} by {getattr(submission.author, "name", "[deleted]")} with {submissionFlair} flair, Mod: {modAction._mod}')
                         else:
                             try:
                                 actionParam = self.flairList[submissionFlair]
-                                log.info('Removing')
+                                print('Removing')
                                 self.__action(submission, actionParam, modAction)
-                                log.info(f'Successfully removed {submission.shortlink} by {getattr(submission.author, "name", "[deleted]")} with {submissionFlair} flair, Mod: {modAction._mod}')
+                                print(f'Successfully removed {submission.shortlink} by {getattr(submission.author, "name", "[deleted]")} with {submissionFlair} flair, Mod: {modAction._mod}')
                             except Exception as error:
                                 log.exception(error)
                                 pass
@@ -99,7 +109,7 @@ class FlairRemoval:
                         log.exception(error)
                         pass
             except Exception as error:
-                log.exception(f'{error}')
+                log.exception(error)
                 pass
 
     def __action(self, submission: praw.models.reddit.submission.Submission, action: dict, modAction: praw.models.ModAction, testing=False):
@@ -108,26 +118,25 @@ class FlairRemoval:
             try:
                 if 'ban' in action:
                     self.__setBan(submission, action['ban'])
-            except Exception as error:
-                log.error(f'{error}')
-            try:
                 if 'lock' in action:
                     submission.mod.lock()
-            except Exception as error:
-                log.error(f'{error}')
-            comment = submission.reply(action['commentReply'].format(author=getattr(submission.author, 'name', '[deleted]'), subreddit=submission.subreddit, kind=thingTypes[submission.fullname[:2]], domain=submission.domain, title=submission.title, url=submission.shortlink))
-            comment.mod.distinguish(how='yes', sticky=True)
-            comment.mod.approve()
-            if 'usernote' in action:
-                usernote = action['usernote']
-                try:
+                if 'commentReply' in action:
+                    comment = submission.reply(action['commentReply'].format(author=getattr(submission.author, 'name', '[deleted]'), subreddit=submission.subreddit, kind=thingTypes[submission.fullname[:2]], domain=submission.domain, title=submission.title, url=submission.shortlink))
+                    comment.mod.distinguish(how='yes', sticky=True)
+                    comment.mod.approve()
+                if 'usernote' in action:
+                    usernote = action['usernote']
                     subredditUsernotes = Usernotes(reddit=self.reddit, subreddit=submission.subreddit)
                     subredditUsernotes.addUsernote(user=submission.author, note=usernote['usernote'], thing=submission, warningType=usernote['usernoteWarningType'])
-                except Exception as error:
-                    log.error(f'{error}')
-        data = {'embeds': self.__generateEmbed(submission, action, modAction)}
-        log.debug(data)
-        requests.post(self.webhook, json=data)
+            except Exception as error:
+                log.error(error)
+        if self.webhookEnabled:
+            if self.slack:
+                data = self.__generateSlackEmbed(submission, action, modAction)
+            else:
+                data = {'embeds': self.__generateEmbed(submission, action, modAction)}
+            log.debug(data)
+            requests.post(self.webhook, json=data)
 
     def __generateEmbed(self, submission: praw.models.reddit.submission.Submission, params: dict, modAction: praw.models.ModAction):
         embed = embeds.Embed(title='Bot Removal Notification', url=submission.shortlink, description=params['description'])
@@ -171,18 +180,77 @@ class FlairRemoval:
         embed.set_footer(text=time.strftime('%B %d, %Y at %I:%M:%S %p %Z', time.gmtime()))
         return [embed.to_dict()]
 
+    def __slackEmbedField(self, name, value, inline=True):
+        return {"title": name, "value": value, "short": inline}
+
+    def __generateSlackEmbed(self, submission: praw.models.reddit.submission.Submission, params: dict, modAction: praw.models.ModAction):
+
+        attachment = {
+            "mrkdwn_in": ["text", "fields", "value"],
+            "color": "#36a64f",
+            "title": "Bot Removal Notification",
+            "title_link": submission.shortlink,
+            "text": params['description'],
+            "fields": [],
+            "ts": time.gmtime()
+        }
+        if not submission.is_self:
+            attachment['thumb_url'] = submission.url
+        attachment['fields'].append(self.__slackEmbedField(name='Submission:', value=f'<{submission.shortlink}|{submission.title}>', inline=False))
+        if submission.author:
+            attachment['author_name'] = submission.author.name
+            attachment['author_link'] = f'https://reddit.com/user/{submission.author.name}'
+            attachment['author_icon'] = submission.author.icon_img
+        else:
+            attachment['author_name'] = '[deleted]'
+        attachment['fields'].append(self.__slackEmbedField(name='Posted At:', value=time.strftime('%b %d, %Y %I:%M %p %Z', time.gmtime(submission.created_utc))))
+        attachment['fields'].append(self.__slackEmbedField(name='Score:', value=f'{submission.score:,}'))
+        attachment['fields'].append(self.__slackEmbedField(name='Comments:', value=f'{submission.num_comments:,}'))
+        attachment['fields'].append(self.__slackEmbedField(name='Removed By:', value=f'{modAction._mod}'))
+        if 'ban' in params:
+            duration = self.__checkBanDuration(params['ban'])
+            if duration:
+                if duration > 1:
+                    attachment['fields'].append(self.__slackEmbedField(name='Ban Duration:', value=f'{duration:,} days'))
+                else:
+                    attachment['fields'].append(self.__slackEmbedField(name='Ban Duration:', value=f'{duration:,} day'))
+            else:
+                attachment['fields'].append(self.__slackEmbedField(name='Ban Duration:', value='Permanent'))
+        modReports = self.__parseModReports(submission)
+        if modReports:
+            if not modReports[0][1] == 0:
+                attachment['fields'].append(self.__slackEmbedField(name=f'Mod Reports ({modReports[0][1]:,}):', value=modReports[0][0]))
+            if not modReports[1][1] == 0:
+                attachment['fields'].append(self.__slackEmbedField(name=f'Mod Reports Dismissed ({modReports[1][1]:,}):', value=modReports[1][0]))
+        userReports = self.__parseUserReports(submission)
+        if userReports:
+            if not userReports[0][1] == 0:
+                attachment['fields'].append(self.__slackEmbedField(name=f'User Reports ({userReports[0][1]:,}):', value=userReports[0][0]))
+            if not userReports[1][1] == 0:
+                attachment['fields'].append(self.__slackEmbedField(name=f'User Reports Dismissed ({userReports[1][1]:,}):', value=userReports[1][0]))
+        usernotesString = None
+        if submission.author:
+            usernotesString = self.__parseUsernotes(Usernotes(reddit=self.reddit, subreddit=submission.subreddit), submission.author.name)
+        if usernotesString:
+            attachment['fields'].append(self.__slackEmbedField(name='Usernotes:', value=usernotesString, inline=False))
+        return {"channel": self.slackChannel, "attachments": [attachment]}
+
     def __checkBanDuration(self, banParams):
         if 'duration' in banParams:
             banNum = int(''.join(['0']+[letter for letter in str(banParams['duration']) if letter in string.digits]))
-            if banNum > 0: return banNum
-            else: return None
-
-    def __setBan(self, submission: praw.models.reddit.submission.Submission, params: dict):
-        duration = self.__checkBanDuration(params)
-        if duration:
-            self.subreddit.banned.add(submission.author, duration=params['duration'], ban_reason=params['ban_reason'], ban_message=params['ban_message'], note=params['ban_note'])
+            if banNum > 0:
+                return banNum
+            else:
+                return None
         else:
-            self.subreddit.banned.add(submission.author, duration=params['duration'], ban_reason=params['ban_reason'], ban_message=params['ban_message'].format(submission), note=params['ban_note'])
+            return None
+
+    def __setBan(self, submission: praw.models.Submission, params: dict):
+        duration = self.__checkBanDuration(params)
+        ban_message = params.get('ban_message')
+        if ban_message:
+            ban_message = ban_message.format(author=getattr(submission.author, 'name', '[deleted]'), subreddit=submission.subreddit, kind=thingTypes[submission.fullname[:2]], domain=submission.domain, title=submission.title, url=submission.shortlink)
+        self.subreddit.banned.add(submission.author, duration=duration, ban_reason=params.get('ban_reason'), ban_message=ban_message, note=params.get('ban_note'))
 
     def __parseUserReports(self, submission: praw.models.reddit.submission.Submission):
         userReports = []

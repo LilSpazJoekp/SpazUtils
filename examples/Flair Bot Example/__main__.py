@@ -1,9 +1,7 @@
 import praw, psycopg2
-import SpazUtils
 from SpazUtils import FlairRemoval
 from removalreasons import flairList
 import config
-from BotUtils.CommonUtils import BotServices
 
 # Reddit instance
 reddit = praw.Reddit(**config.redditParams)
@@ -38,8 +36,6 @@ subreddit = reddit.subreddit(subredditName)
 flairRemoval = FlairRemoval(reddit, subreddit, config.webhook, flairList, botName, sql)
 logStream = flairRemoval.logStream
 checkModAction = flairRemoval.checkModAction
-
-import logging
 
 ###starting bot####
 print('Starting bot')
