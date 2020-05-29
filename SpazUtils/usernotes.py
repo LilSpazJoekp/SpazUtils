@@ -143,7 +143,7 @@ class Usernotes:
             usernotes[note[1]]['ns'].append({'l': note[0], 'm': note[4], 'n': note[3], 't': note[2], 'w': note[5]})
         return mods, warnings, usernotes
 
-    def addUsernote(self, user: praw.reddit.models.Redditor, note: str, thing: Union[praw.reddit.models.Submission, praw.reddit.models.Comment, praw.reddit.models.ModmailConversation, str, None], warningType: str):
+    def addUsernote(self, user: praw.reddit.models.Redditor, note: str, thing: Union[praw.reddit.models.Submission, praw.reddit.models.Comment, praw.reddit.models.ModmailConversation, str, None], warningType: str, mod: Union[praw.reddit.models.Redditor,str,None]):
         '''Adds an usernote, to the selected subreddit and automatically saves it to wiki page.
 
             Parameters
@@ -163,9 +163,13 @@ class Usernotes:
             -------
             None
         '''
-        
-        mod = self.reddit.user.me()
 
+        try:
+            if isinstance(mod, str):
+                mod = self.reddit.redditor(mod)
+            mod._fetch()
+        except prawcore.NotFound:
+            raise prawcore.NotFound(f'mod, {mod}, either deleted their account or it does not exist.')
         try:
             if isinstance(user, str):
                 user = self.reddit.redditor(user)
@@ -177,16 +181,15 @@ class Usernotes:
                 raise Exception(f'User, {user} is currently suspended.')
 
         if not mod in self.subreddit.moderator():
-            raise Exception(f'Current authencated user, {mod}, is not a moderator of {subreddit.display_name}')
+            raise Exception(f'Current authencated user, {mod}, is not a moderator of {self.subreddit.display_name}')
 
         if not 'wiki' in self.subreddit.moderator.PERMISSIONS:
-            raise Exception(f'Current authencated user, {mod}, does not have Wiki permissions on {subreddit.display_name}')
+            raise Exception(f'Current authencated user, {mod}, does not have Wiki permissions on {self.subreddit.display_name}')
 
         notes = self.getUsernotes()
         warningTypes = self.getUsernoteWarningColor()
         if not warningType in warningTypes:
             raise Exception(f'Warning type, {warningType}, not found usernote warning list')
-        userNotes = None
         if user.name in notes:
             userNotes = notes[user.name]
             new = False
